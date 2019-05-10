@@ -1,0 +1,207 @@
+<!DOCUTYPE HTML>
+<html>
+    <head>
+        <title>
+            打砖块. by 一只柯楠
+        </title>
+        <style type="text/css">
+            #zn{
+                border: 10px red solid;
+                margin: 0 auto;
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>打砖块</h1>
+        <hr />
+        空格键：暂停;<br />
+        方向左右键：控制接球板;<br />
+        <canvas id="zn" width="480" height="760"></canvas>
+        <script type="text/javascript">
+            var Brick= function () {
+                var requestAnim= window.requestAnimationFrame ||
+                        window.webkitRequestAnimationFrame ||
+                        window.mozRequestAnimationFrame ||
+                        window.oRequestAnimationFrame ||
+                        window.msRequestAnimationFrame ||
+                        function(callback) { return setTimeout(callback, 100/6); },
+                cancelAnim= window.cancelAnimationFrame ||
+                    window.webkitCancelAnimationFrame ||
+                    window.mozCancelAnimationFrame ||
+                    window.oCancelAnimationFrame ||
+                    window.msCancelAnimationFrame ||
+                    function(timeid) { return clearTimeout(timeid); },
+                col= 8, row= 8, BW, BH= 30, BS= 1, r= 18, random= function (n1, n2) {   return Math.round(Math.random()*(n2- n1))+n1},
+                elWidth, elHeight, cycle= 200, N= 0, score= 0, 
+                randColor= function(c1, c2){ return 'rgb('+ random(c1 || 0, c2 || 255)+ ','+ random(c1 || 0, c2 || 255)+ ','+ random(c1 || 0, c2 || 255)+ ')'} ,
+                init = function (id) {
+                var el= this.el= document.querySelector(id);
+                    elWidth= el.width, elHeight= el.height;
+                    this.c= el.getContext('2d');
+                    BW= +(elWidth/col-BS).toFixed(2);
+                    this.RL= (elWidth- BW)/2;
+                    this.RT= elHeight- BH- BS;
+                    this.x= this.RL+ (BW/2);
+                    this.y= elHeight-r- BH- BS;
+                    this.xv= random(46, 90)* (Math.random()> .5 ? 2 : -2);
+                    this.yv= -4* 126;
+                    this.initBricks();
+                    //暂停
+                    this.suspend= true;  
+                    this.listenerEvent();
+                } 
+  
+                init.prototype= {
+  
+                    start: function (timestamp) {
+                        var self= this, newTime= Date.now(), diffX, diffY, diffTime= newTime- (timestamp || newTime) , x, y;
+                        if(++N=== cycle){
+                            N= 0;
+                            var ary= [];
+                            this.tables.unshift(ary); 
+                            for(var i =0 ; i< col; i++){
+                                ary.push(1);
+                            }
+                        }
+                        diffX= this.xv* diffTime/1000;
+                        diffY= this.yv* diffTime/1000;
+                        this.clearView();
+                        //绘制砖块
+                        this.drawBricks();
+                        //绘制小球
+                        this.drawBall(0, 0);
+                        //绘制接球板
+                        this.drawRacket();
+                        //绘制得分
+                        this.showText(score);
+                        if(this.downKeyLeft)
+                            this.RL= Math.max(this.RL- BW/5, 0);
+                        else if(this.downKeyRight)
+                            this.RL= Math.min(this.RL+ BW/5, elWidth- 2*BW);
+                        x= this.x+ diffX;
+                        y= this.y+ diffY;
+  
+                        if(x- r <0 || x+ r > elWidth)
+                            this.xv *= -1;
+                        if(y- r< 0)
+                            this.yv *= -1;
+                        else if(y+ r> this.RT){
+                            if(x+ r> this.RL && x-r< this.RL+ 2*BW)
+                                this.yv *= -1;
+                            else{
+                                this.suspend= true ;
+                                this.clearView();
+                                this.showText('GAME OVER');
+                            }
+                        }
+                        var i= Math.floor(x/(BW +BS)), j= Math.floor(y/(BH +BS));
+                            if(this.tables[j] && this.tables[j][i]===1){
+                                this.tables[j][i]= 0;
+                                score+= 100;
+                                this.yv*=-1;
+                            }
+                        if(!this.suspend){
+                            this.x= x;
+                            this.y= y;
+                            this.animID= requestAnim(function () {
+                                self.start(newTime);
+                            })
+                        }
+                        return this;
+                    },
+  
+                    clearView: function () {
+                        var c= this.c;
+                        c.clearRect(0, 0, elWidth, elHeight);
+                    },
+  
+                    initBricks: function(){
+                        this.tables= [];
+                        for(var i=0; i< col; i++){
+                            this.tables.push([]);
+                            for(var j=0; j< row; j++){
+                                this.tables[i][j]= 1;
+                            }
+                        }
+                    },
+  
+                    drawRacket: function () {
+                        this.drawRect(this.RL, this.RT, 2*BW, BH, 1, 1);
+                    },
+  
+                    drawBall: function(c1, c2){
+                        var c= this.c;  
+                        c.beginPath();
+                        c.arc(this.x, this.y, r, 0, 2*Math.PI);
+                        c.fillStyle= '#000'//randColor(c1 || 150, c2 || 255);
+                        c.closePath();
+                        c.fill();
+                    },
+                      
+                    drawRect: function(x, y, w, h, c1, c2){
+                        var c= this.c;
+                        c.beginPath();
+                        c.fillStyle= randColor(c1 || 0, c2 || 255);
+                        c.closePath();
+                        c.fillRect(x, y, w, h);
+                    },
+  
+                    drawBricks: function(){
+                        var i= 0,len= this.tables.length, cur, tables= this.tables;
+                        for(; i< len; i++){
+                            cur= tables[i];
+                            for(var j= 0; j< cur.length; j++){
+                                cur[j]===1 && this.drawRect(j*(BW+ BS), i*(BH+ BS), BW, BH);
+                            }
+                        }
+                    },
+  
+                    listenerEvent: function(e){
+                        document.addEventListener('keydown', this, false);
+                        document.addEventListener('keyup', this, false);
+                    },
+  
+                    handleEvent: function(e){
+                        var type= e.type, keycode= e.keyCode;
+                        if(keycode===37 || keycode=== 39 || keycode=== 32){
+                            switch(type){
+                                case 'keydown':
+                                    if(keycode === 37) this.downKeyLeft= true;
+                                    else if(keycode===39)  this.downKeyRight = true;
+                                    break;
+                                case 'keyup':
+                                    if(keycode === 37) 
+                                        this.downKeyLeft= false;
+                                    else if (keycode===39)
+                                        this.downKeyRight = false
+                                    else{
+                                        this.suspend= !this.suspend;
+                                        !this.suspend && this.start();
+                                    }
+  
+                            }
+                        }
+                    },
+  
+                    showText: function(txt, left, top, size){
+                        var c= this.c, tw;
+                        size = size || 60;
+                        c.beginPath();
+                        c.font= size+ 'pt Calibri';
+                        tw= c.measureText(txt).width; 
+                        left= left=== undefined ? (elWidth- tw)/2 : left; 
+                        top= top=== undefined ? (elHeight- size)/2 : top; 
+                        c.fillText(txt, left, top);
+                        c.closePath();
+                    },
+                      
+  
+                }
+                return init;
+            }();
+        b= new Brick('#zn');
+        b.start();
+        </script>
+    </body>
+</html>

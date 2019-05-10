@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <meta charset="UTF-8">
+        <title>任意画布</title>
+    </head>
+    <style type="text/css">
+        *{
+            padding: 0;
+            margin: 0;
+        }
+        body{
+            font-size: 0;
+        }
+        canvas{
+            border: 1px solid red;
+        }
+        .tool-box{
+            font-size: 14px;
+            border: 1px solid red;
+            height: calc(100% - 22px);
+            width: calc(20% - 22px);
+            position: absolute;
+            left: 80%;
+            top: 0;
+            text-align: center;
+            padding: 10px;
+        }
+        .clear::after{
+            content: '';
+            display: block;
+            clear: both;
+        }
+        .pen_color_list{
+            display: inline-block;
+            height: 30px;
+            width: 30px;
+            border: 1px solid #ccc;
+        }
+        .pen_color_list.active{
+            border: 1px solid red;
+        }
+        .title{
+            font-size: 16px;
+            padding: 10px 0;
+            margin-top: 10px;
+            border-top: 1px solid #ccc;
+        }
+        .tips_box{
+            color: red;
+        }
+    </style>
+    <body style="display: none" onload="myCanvas.init()">
+        <canvas id="canvas" width="800" height="600" style="cursor: url(pen.png),default;"></canvas>
+        <div class="tool-box">
+            <p class="title">当前画笔颜色</p>
+            <div>
+                <span class="pen_color_list" id="currentColor" style="background-color: black"></span>
+            </div>
+
+            <p class="title">设置画笔颜色</p>
+            <button style="margin-bottom: 10px" id="randomColor">获取随机颜色</button>
+            <div class="clear" id="pen_color"></div>
+
+            <p class="title">设置笔/橡皮大小</p>
+            <div id="pen_size">
+                <input type="number" id="lineSet" value="3" style="width: 60px;">
+            </div>
+
+            <p class="title">自定义画笔颜色值(输入回车生效)</p>
+            <div>
+                <input type="text" id="pen_custom_color" placeholder="支持RGB、十六进制、英文">
+            </div>
+
+            <p class="title">工具区</p>
+            <div>
+                <button style="margin-bottom: 10px" id="switchTool">切换橡皮擦</button>
+            </div>
+
+            <p class="title">提示</p>
+            <div class="tips_box">
+                <p>1、鼠标右键可以直接切换笔或橡皮</p>
+                <p>2、鼠标滚轮可以调画笔或橡皮大小</p>
+            </div>
+
+            <p class="title">多人设置</p>
+            <div>
+                <button style="margin-bottom: 10px" id="setSocketBtn">进入房间</button>
+            </div>
+            <div>
+                <button style="margin-bottom: 10px;display: none;" id="startDraw">开始画画</button>
+            </div>
+
+            <img id="drawCanvas" style="position: fixed;left: 0;top: 0;">
+        </div>
+        <script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
+        <script type="text/javascript" src="../socket/api_config.js"></script>
+        <script type="text/javascript">
+            var myCanvas = {
+                init: function(){
+                    var canvas = this.canvas = document.getElementById('canvas');
+                    if (canvas.getContext){
+                        this.ctx = canvas.getContext('2d');
+                        this.resizeCanvas();
+                        this.setCanvasStyle();
+                        document.body.style.display = 'block';
+                    }else{
+                        alert('当前浏览器不支持canvas!');
+                    }
+
+                    //打开socket
+                    // this.openSocket();
+
+                    this.bindEvent();
+                },
+                bindEvent: function(){
+                    var _this = this;
+                    //设置滚轮事件
+                    _this.windowAddMouseWheel();
+                    //根据浏览器变化调整画布
+                    window.onresize = function(){
+                      _this.resizeCanvas();
+                    }
+
+                    var setSocketBtn = document.getElementById('setSocketBtn');
+                    setSocketBtn.addEventListener('click', function(){
+                        _this.openSocket(setSocketBtn);
+                    },false)
+
+                    var startDrawBtn = document.getElementById('startDraw');
+                    startDrawBtn.addEventListener('click', function(){
+                        document.getElementById('drawCanvas').style.display = 'none';
+                    },false)
+                },
+                openSocket: function(setSocketBtn){
+                    var _this = this;
+                    if(window.s){
+                        window.s.close();
+                        window.s = null;
+                        setSocketBtn.innerHTML = '进入房间';
+                        return;
+                    }else{
+                        /*创建socket连接*/
+                        var socket = _this.socket = new WebSocket("ws://" + socketApi);
+
+                        socket.onopen = function () {
+                            console.log('WebSocket open');//成功连接上Websocket
+                        };
+                        socket.onclose = function () {
+                            console.log('WebSocket close');//成功连接上Websocket
+                        };
+                        socket.onmessage = function (e) {
+                            var data = JSON.parse(e.data);
+                            if(data.dataType === 'base64'){
+                                document.getElementById('drawCanvas').src = data.str;
+                            }else{
+                                alert(data.str);
+                            }
+                        };
+
+                        if (socket.readyState == WebSocket.OPEN) socket.onopen();
+                        window.s = socket;
+                        setSocketBtn.innerHTML = '退出房间';
+                        document.getElementById('startDraw').style.display = 'inline-block';
+                        return;
+                    }
+                    // Call onopen directly if socket is already open
+                },
+                windowAddMouseWheel: function(){
+                    var _this = this, ctx = this.ctx;
+                    var lineSetEl = document.getElementById('lineSet');
+                    var scrollFunc = function (e) {  
+                        e = e || window.event;   // e 代表事件（event）对象，即所谓的事件驱动源
+                        if (e.wheelDelta) {  //判断浏览器IE，谷歌滑轮事件  
+                            if (e.wheelDelta > 0) { //当滑轮向上滚动时 
+                                lineSetEl.value++;
+                            }  
+                            if (e.wheelDelta < 0 ) { //当滑轮向下滚动时  
+                                if(lineSetEl.value > 1) lineSetEl.value--;
+                            }  
+                        }else if(e.detail){  //Firefox滑轮事件  
+                            if(e.detail>0){ //当滑轮向上滚动时  
+                                lineSetEl.value++;
+                            }  
+                            if (e.detail< 0) { //当滑轮向下滚动时  
+                                if(lineSetEl.value > 1) lineSetEl.value--;
+                            }  
+                        }
+                        ctx.lineWidth = lineSetEl.value;
+                    };  
+                    //给页面绑定滑轮滚动事件  
+                    if (document.addEventListener) {  
+                        _this.canvas.addEventListener('DOMMouseScroll', scrollFunc, false);  
+                    }  
+                    //滚动滑轮触发scrollFunc方法  
+                    window.onmousewheel = document.onmousewheel = scrollFunc;  
+                },
+                resizeCanvas: function(){  //初始化画布大小
+                    var canvas = this.canvas;
+                    drawCanvas.width = canvas.width  = window.innerWidth * .8;
+                    drawCanvas.height = canvas.height = window.innerHeight - 2;
+
+                },
+                setCanvasStyle: function(){
+                    var ctx = this.ctx;
+
+                    //设置线宽
+                    ctx.lineWidth = document.getElementById('lineSet').value;
+                    //设置线的颜色
+                    ctx.strokeStyle = document.getElementById('currentColor').style.backgroundColor;
+
+                    this.addCanvasEvent();
+                },
+                setRandomColor: function(){
+                    var _this = this, ctx = this.ctx;
+                    var penColorEl = document.getElementById('pen_color');
+                    var currentColorEl = document.getElementById('currentColor');
+                    var lineSetEl = document.getElementById('lineSet');
+                    var colorListHtml = '',setColor = '', randomNum = 0;
+                    var str = '0123456789abcdefg';
+                    for(var i = 0 ; i < 30;i++){
+                        setColor = '#';
+                        for(var x = 0 ; x < 6 ;x++){
+                            randomNum = Math.floor(Math.random() * 10);
+                            setColor += str[randomNum];
+                        }
+                        colorListHtml += '<span class="pen_color_list" style="background-color: ' + setColor + '"></span>'
+                    }
+                    penColorEl.innerHTML = colorListHtml;
+
+                    var penColorListEls = penColorEl.getElementsByClassName('pen_color_list');
+                    for(var i = 0 ; i < penColorListEls.length ;i++){
+                        penColorListEls[i].addEventListener('click', function(){
+                            ctx.strokeStyle = this.style.backgroundColor;
+                            currentColorEl.style.backgroundColor = this.style.backgroundColor;
+                            for(var i = 0 ; i < penColorListEls.length ;i++){
+                                penColorListEls[i].className = 'pen_color_list';
+                            }
+                            this.className = 'pen_color_list active';
+                            document.getElementById('switchTool').innerHTML = '切换橡皮擦';
+                            _this.canvas.style.cursor = 'url(pen.png),default';
+                            ctx.lineWidth = lineSetEl.value = _this.oldLineSet;
+                        }, false)
+                    }
+                },
+                switchTool: function(el){
+                    var _this = this, ctx = this.ctx;
+                    var lineSetEl = document.getElementById('lineSet');
+                    if(_this.canvas.style.cursor.indexOf('pen.png') > -1){
+                        ctx.strokeStyle = '#fff';
+                        _this.canvas.style.cursor = 'url(eraser.png),default';
+                        el.innerHTML = '切换画笔';
+                        _this.oldLineSet = lineSetEl.value;
+                        ctx.lineWidth = lineSetEl.value = 20;
+                    }else{
+                        ctx.strokeStyle = document.getElementById('currentColor').style.backgroundColor;
+                        _this.canvas.style.cursor = 'url(pen.png),default';
+                        el.innerHTML = '切换橡皮擦';
+                        ctx.lineWidth = lineSetEl.value = _this.oldLineSet;
+                    }
+                },
+                addCanvasEvent: function(){
+                    var _this = this,ctx = this.ctx;
+                    var lineSetEl = document.getElementById('lineSet');
+                    var switchToolEl = document.getElementById('switchTool');
+                    //设置画笔大小
+                    lineSetEl.oninput = function(e){
+                        if(isNaN(Number(this.value))){
+                            ctx.lineWidth = 1;
+                            this.value = 1;
+                        }else{
+                            ctx.lineWidth = Number(this.value);
+                        }
+                    }
+
+                    //设置画笔颜色
+                    _this.setRandomColor();
+                    //设置随机按钮
+                    var randomColorEl = document.getElementById('randomColor');
+                    randomColorEl.addEventListener('click', function(){
+                        _this.setRandomColor();
+                    }, false)
+
+                    //设置自定义画笔颜色
+                    document.getElementById('pen_custom_color').onkeydown = function(e){
+                        if(!e){
+                            e = window.event;
+                        }
+                        if((e.keyCode || e.which) == 13){
+                            document.getElementById('currentColor').style.backgroundColor = ctx.strokeStyle = this.value;
+                            currentColorEl.style.backgroundColor = this.value;
+                            switchToolEl.innerHTML = '切换橡皮擦';
+                            _this.canvas.style.cursor = 'url(pen.png),default';
+                        }
+                    }
+
+                    //设置切换工具
+                    switchToolEl.addEventListener('click', function(){
+                        _this.switchTool(this);
+                    }, false)
+
+                    //设置画笔动作
+                    canvas.onmousedown = function(event){
+
+                        if (event.button == 0) {
+                            _this.paint = true;
+                            ctx.beginPath();
+                        }else if(event.button == 1){
+
+                            console.log("鼠标滚轮!");
+                        }
+                        // ctx.moveTo(e.pageX-this.offsetLeft,e.pageY-this.offsetTop);
+                    }
+
+                    canvas.oncontextmenu = function(event){
+                        if (event.button == 2){
+                            _this.switchTool(switchToolEl);
+                            event.preventDefault();
+                        }
+                    }
+
+                    canvas.onmouseout = function(e){
+                        _this.paint = false;
+                    }
+                    var timer = null;
+                    canvas.onmousemove=function(e){
+                        if(_this.paint){
+                            //划线到当前客户端的x与y座标
+                            ctx.lineTo(e.clientX, e.clientY + 25);
+                            //执行画线
+                            ctx.stroke();
+                            //如果未连接到websocket
+                            if (!window.s) {
+                                console.log("websocket未连接.");
+                            } else {
+                                clearTimeout(timer);
+                                timer = setTimeout(function(){
+                                    window.s.send(canvas.toDataURL());//通过websocket发送数据
+                                }, 500)
+                            }
+                        }
+                    }
+
+                    canvas.onmouseup = function(e){
+                        _this.paint = false;
+                    }
+                }
+            }
+            window.myCanvas = myCanvas;
+        </script>
+    </body>
+
+</html>

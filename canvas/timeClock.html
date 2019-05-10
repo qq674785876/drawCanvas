@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>canvas时钟</title>
+	<style type="text/css">
+		*{
+			padding: 0;margin: 0;
+		}
+		.canvas-box{
+			font-size: 0;
+		}
+		#timeClock{
+		}
+	</style>
+</head>
+<body onload="myCanvas.init()">
+	<div class="canvas-box">
+		<canvas id="timeClock"></canvas>
+	</div>
+	<script type="text/javascript">
+		var myCanvas = {
+			init: function(){
+				var canvas = this.canvas = document.getElementById('timeClock');
+				if (canvas.getContext){
+		          this.ctx = canvas.getContext('2d');
+		          // this.resizeCanvas();
+		          this.startDraw();
+		        }else{
+		        	alert('当前浏览器不支持canvas!');
+		        }
+
+		        this.bindEvent();
+			},
+			bindEvent: function(){
+				var _this = this;
+		        //根据浏览器变化调整画布
+				window.onresize = function(){
+		          _this.resizeCanvas();
+				}
+			},
+			resizeCanvas: function(){  //初始化画布大小
+				var canvas = this.canvas;
+	            if (canvas.width  < window.innerWidth)
+	            {
+	                canvas.width  = window.innerWidth;
+	            }
+	 
+	            if (canvas.height < window.innerHeight)
+	            {
+	                canvas.height = window.innerHeight;
+	            }
+			},
+			startDraw: function(){
+				var ctx = this.ctx;
+
+				ctx.fillStyle = "rgb(200,0,0)";
+		        ctx.fillRect (10, 10, 50, 50);
+
+		        ctx.fillStyle = "rgba(0, 0, 200, 0.5)";
+		        ctx.fillRect (30, 30, 50, 50);
+			}
+		}
+		window.myCanvas = myCanvas;
+	</script>
+</body>
+</html>

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>我的画布</title>
+	<style type="text/css">
+		.code-box{
+		}
+		.code-box textarea{
+			font-size: 16px;
+			color: blue;
+			height: 400px;
+			width: 600px;
+		}
+	</style>
+</head>
+<body>
+	<canvas id="canvas" style="width: 300px;height: 300px; border:1px solid black;"></canvas>
+	<div class="code-box">
+		<textarea id="myCode">var oC = document.getElementById('canvas');
+oC.width = 300;
+oC.height = 300;
+ctx.moveTo(0, 0);
+ctx.lineTo(300, 300);
+ctx.stroke();
+		</textarea>
+	</div>
+	<p>
+		<a href="javascript:;" onclick="runCode()">run代码</a>
+        <a href="javascript:;" onclick="startTimeClock();document.getElementById('myCode').value = '(' + startTimeClock + '())'">run时钟</a>
+		<a href="javascript:;" onclick="startSun();document.getElementById('myCode').value = '(' + startSun + '())'">run自转</a>
+	</p>
+	<div id="scriptBox">
+		
+	</div>
+	<script>
+	    var oC = document.getElementById('canvas');
+	    var ctx = oC.getContext("2d");
+	    if(getQueryString('on')){
+		    oC.width = 300;
+	    	oC.height = 300;
+	    }
+	    ctx.moveTo(0, 0);
+	    ctx.lineTo(200, 200);
+	    ctx.stroke();
+
+	    function getQueryString(name) { 
+	        var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i"); 
+	        var r = window.location.search.substr(1).match(reg); 
+	        if (r != null) return unescape(r[2]); 
+	        return null; 
+	    } 
+
+	    function runCode(){
+	    	var myCode = document.getElementById('myCode');
+	    	var scriptBox = document.getElementById('scriptBox');
+
+	    	scriptBox.innerHtml = myCode.value;
+	    	try{
+	    		eval(scriptBox.innerHtml);
+	    	}catch(error){
+	    		alert('错误代码！' + error);
+	    	}
+	    }
+	    window.timer = null;
+	    window.startTimeClock = function (){
+	    	var canvas = document.getElementById("canvas");
+            var ctx = canvas.getContext('2d');
+            clearInterval(timer);
+			canvas.width = 300;
+	    	canvas.height = 300;
+            run();
+            timer = setInterval(run,1000);
+            function run(){
+                var time = new Date();//获取现在时间
+                var sec = time.getSeconds();//获取秒
+                var min = time.getMinutes();//获取分钟
+                var hour = time.getHours();//获取小时
+                hour = hour>12 ? hour-12 : hour;
+                ctx.clearRect(0,0,300,300);
+                ctx.save();
+                ctx.beginPath();
+                ctx.lineWidth = 3;
+                ctx.arc(150,150,130,0,2*Math.PI);
+                var color = ctx.createRadialGradient(150,150,30,150,150,100);
+                color.addColorStop(0.0,"rgb(48, 209, 219)");
+                color.addColorStop(1.0,"rgb(30, 231, 116)");
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = "aqua";
+                ctx.stroke();
+                ctx.restore();
+                ctx.save();
+                ctx.translate(150,150);
+                for(var i=0; i<60; i++){
+                    if(i%5 == 0){
+                        ctx.beginPath();
+                        ctx.moveTo(0,120);
+                        ctx.lineTo(0,130);
+                        ctx.lineWidth = 5;
+                        ctx.strokeStyle = "blue";
+                        ctx.stroke();
+                        ctx.rotate(Math.PI/30);
+                    }else{
+                        ctx.beginPath();
+                        ctx.moveTo(0,120);
+                        ctx.lineTo(0,126);
+                        ctx.lineWidth = 1;
+                        ctx.strokeStyle = "cornflowerblue";
+                        ctx.stroke();
+                        ctx.rotate(Math.PI/30);
+                    }
+
+                }
+                ctx.restore();
+                //秒针
+                ctx.save();
+                ctx.translate(150,150);
+                ctx.rotate(sec*Math.PI/30);
+                ctx.beginPath();
+                ctx.moveTo(0,30);
+                ctx.lineTo(0,-120);
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = "red";
+                ctx.stroke();
+                ctx.restore();
+                //分针
+                ctx.save();
+                ctx.translate(150,150);
+                ctx.rotate(sec*Math.PI/1800 + min*Math.PI/30);//每一秒再分60分，秒针走一刻度，分针要走1/60刻度,sec*(6*Math.PI/180)/60
+                ctx.beginPath();
+                ctx.moveTo(0,20);
+                ctx.lineTo(0,-100);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = "yellow";
+                ctx.stroke();
+                ctx.restore();
+                //时针
+                ctx.save();
+                ctx.translate(150,150);
+                ctx.rotate(min*Math.PI/360 + hour*Math.PI/6);//每一小时走过5个刻度线,60分钟,30deg，分成60份,30deg/60
+                ctx.beginPath();
+                ctx.moveTo(0,10);
+                ctx.lineTo(0,-80);
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = "black";
+                ctx.stroke();
+                ctx.restore();
+            }
+	    }
+
+
+        window.startSun = function(){
+            var sun;
+            var earth;
+            var moon;
+            var ctx;
+            function init(){
+                sun = new Image();
+                earth = new Image();
+                moon = new Image();
+                sun.src = "sun.jpg";
+                earth.src = "earth.png";
+                moon.src = "moon.png";
+             
+                var canvas = document.querySelector("#canvas");
+                canvas.width = 300;
+                canvas.height = 300;
+                ctx = canvas.getContext("2d");
+             
+                draw()
+             
+            }
+            init();
+            function draw(){
+                ctx.clearRect(0, 0, 300, 300); //清空所有的内容
+                /*绘制 太阳*/
+                // ctx.drawImage(sun, 0, 0, 300, 300);
+                //设置弧线的颜色为蓝色
+                ctx.strokeStyle = "blue";
+                var circle = {
+                    x : 150,    //圆心的x轴坐标值
+                    y : 150,    //圆心的y轴坐标值
+                    r : 50      //圆的半径
+                };
+                //以canvas中的坐标点(100,100)为圆心，绘制一个半径为50px的圆形
+                ctx.arc(circle.x, circle.y, circle.r, 0, Math.PI * 2, true);    
+                //按照指定的路径绘制弧线
+                ctx.stroke();
+                ctx.fillStyle = 'red';//本来这里最初使用的是red，截图一看，傻眼了，怕上街被爱国者打啊，其实你懂的~~
+                ctx.fill();
+             
+                ctx.save();
+                ctx.translate(150, 150);
+                ctx.closePath();
+             
+                //绘制earth轨道
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(255,255,0,0.5)";
+                ctx.arc(0, 0, 100, 0, 2 * Math.PI)
+                ctx.stroke()
+             
+                var time = new Date();
+                //绘制地球
+                ctx.rotate(2 * Math.PI / 60 * time.getSeconds() + 2 * Math.PI / 60000 * time.getMilliseconds())
+                ctx.translate(100, 0);
+                ctx.drawImage(earth, -12, -12)
+             
+                //绘制月球轨道
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(255,255,255,.3)";
+                ctx.arc(0, 0, 40, 0, 2 * Math.PI);
+                ctx.stroke();
+             
+                //绘制月球
+                ctx.rotate(2 * Math.PI / 6 * time.getSeconds() + 2 * Math.PI / 6000 * time.getMilliseconds());
+                ctx.translate(40, 0);
+                ctx.drawImage(moon, -3.5, -3.5);
+                ctx.restore();
+             
+                requestAnimationFrame(draw);
+            }
+        }
+	</script>
+</body>
+</html>
