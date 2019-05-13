@@ -5,6 +5,7 @@
         <meta charset="UTF-8">
         <title>任意画布</title>
     </head>
+    <link rel="stylesheet" type="text/css" href="css/colpick.css">
     <style type="text/css">
         *{
             padding: 0;
@@ -20,12 +21,12 @@
             font-size: 14px;
             border: 1px solid red;
             height: calc(100% - 22px);
-            width: calc(20% - 22px);
+            width: calc(20% - 2px);
             position: absolute;
             left: 80%;
             top: 0;
             text-align: center;
-            padding: 10px;
+            padding: 10px 0;
         }
         .clear::after{
             content: '';
@@ -50,27 +51,72 @@
         .tips_box{
             color: red;
         }
+        #pen_color_box{
+            position: relative;
+        }
+        #picker{
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #chatRoom{
+            height: calc(100% - 518px);
+            position: relative;
+            padding-bottom: 60px;
+        }
+        #chatRoom > .tips{
+            color: #888;
+        }
+        .edit_tool{
+            position: absolute;
+            width: 100%;
+            left: 1px;
+            bottom: 5px;
+            height: 60px;
+        }
+        .edit_tool textarea{
+            width: calc(80% - 12px);
+            height: calc(100% - 10px);
+            resize:none;
+            font-size: 14px;
+            padding: 5px;
+        }
+        .edit_tool button{
+            width: calc(20%);
+            height: calc(100%);
+            float: right;
+        }
+        .chat_info{
+            overflow: auto;
+            height: calc(100% - 24px);
+        }
+        .chat_info .tips{
+            color: #888;
+            font-size: 14px;
+        }
+        .chat_info .chat-list{
+            text-align: right;
+            padding: 5px 20px;
+        }
+        .chat_info .chat-list.isMe{
+            text-align: left;
+        }
     </style>
     <body style="display: none" onload="myCanvas.init()">
         <canvas id="canvas" width="800" height="600" style="cursor: url(pen.png),default;"></canvas>
         <div class="tool-box">
-            <p class="title">当前画笔颜色</p>
-            <div>
+            <p class="title">当前画笔颜色（点击可切换颜色）</p>
+            <div id="pen_color_box">
                 <span class="pen_color_list" id="currentColor" style="background-color: black"></span>
+                <div id="picker"></div>
             </div>
 
-            <p class="title">设置画笔颜色</p>
-            <button style="margin-bottom: 10px" id="randomColor">获取随机颜色</button>
-            <div class="clear" id="pen_color"></div>
+            <button style="margin-bottom: 10px;display: none;" id="randomColor">获取随机颜色</button>
+            <div class="clear" id="pen_color" style="display: none;"></div>
 
             <p class="title">设置笔/橡皮大小</p>
             <div id="pen_size">
                 <input type="number" id="lineSet" value="3" style="width: 60px;">
-            </div>
-
-            <p class="title">自定义画笔颜色值(输入回车生效)</p>
-            <div>
-                <input type="text" id="pen_custom_color" placeholder="支持RGB、十六进制、英文">
             </div>
 
             <p class="title">工具区</p>
@@ -87,15 +133,26 @@
             <p class="title">多人设置</p>
             <div>
                 <button style="margin-bottom: 10px" id="setSocketBtn">进入房间</button>
-            </div>
-            <div>
                 <button style="margin-bottom: 10px;display: none;" id="startDraw">开始画画</button>
+            </div>
+
+            <p class="title">聊天室</p>
+            <div id="chatRoom">
+                <p class="tips">欢迎来到（你画我猜）小游戏</p>
+                <div class="chat_info" id="chatInfoBox">
+
+                </div>
+                <div class="edit_tool">
+                    <textarea id="chatTextarea" placeholder="输入内容回车发送"></textarea>
+                    <button id="chatBtn">发送(enter)</button>
+                </div>
             </div>
 
             <img id="drawCanvas" style="position: fixed;left: 0;top: 0;">
         </div>
         <script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
         <script type="text/javascript" src="../socket/api_config.js"></script>
+        <script type="text/javascript" src="js/colpick.js"></script>
         <script type="text/javascript">
             var myCanvas = {
                 init: function(){
@@ -132,13 +189,46 @@
                     startDrawBtn.addEventListener('click', function(){
                         document.getElementById('drawCanvas').style.display = 'none';
                     },false)
+
+                    var chatTextareaEl = document.getElementById('chatTextarea');
+                    var chatBtn = document.getElementById('chatBtn');
+                    var socket = _this.socket;
+                    chatBtn.addEventListener('click', function(){
+                        window.s.send(JSON.stringify({
+                            dataType: 'chatInfo',
+                            cont: chatTextareaEl.value
+                        }));
+                        chatTextareaEl.value = '';
+                    },true)
+                    chatTextareaEl.addEventListener('keydown', function(e){
+                        if(!e){
+                            e = window.event;
+                        }
+                        if((e.keyCode || e.which) == 13){
+                            e.preventDefault();
+                            try{
+                                if(!chatTextareaEl.value) return;
+                                window.s.send(JSON.stringify({
+                                    dataType: 'chatInfo',
+                                    cont: chatTextareaEl.value
+                                }));
+                                chatTextareaEl.value = '';
+                            }catch(error){
+                                alert('网络出错：未连接房间!');
+                            }
+                        }
+                    },true)
                 },
+
                 openSocket: function(setSocketBtn){
                     var _this = this;
                     if(window.s){
                         window.s.close();
                         window.s = null;
                         setSocketBtn.innerHTML = '进入房间';
+                        document.getElementById('startDraw').style.display = 'none';
+                        document.getElementById('drawCanvas').style.display = 'block';
+                        _this.ctx.clearRect(0,0,_this.canvas.width,_this.canvas.height);
                         return;
                     }else{
                         /*创建socket连接*/
@@ -146,23 +236,32 @@
 
                         socket.onopen = function () {
                             console.log('WebSocket open');//成功连接上Websocket
+                            setSocketBtn.innerHTML = '退出房间';
                         };
                         socket.onclose = function () {
                             console.log('WebSocket close');//成功连接上Websocket
                         };
                         socket.onmessage = function (e) {
                             var data = JSON.parse(e.data);
+                            var chatInfoBox = document.getElementById('chatInfoBox');
                             if(data.dataType === 'base64'){
-                                document.getElementById('drawCanvas').src = data.str;
-                            }else{
-                                alert(data.str);
+                                document.getElementById('drawCanvas').src = data.cont;
+                            }else if(data.dataType === 'onlineUserNum'){
+                                chatInfoBox.innerHTML += '<p class="tips">' + data.cont + '</p>';
+                                if(data.onlineUserNum && data.onlineUserNum === 1){
+                                    document.getElementById('startDraw').style.display = 'inline-block';
+                                }
+                            }else if(data.dataType === 'chatInfo'){
+                                chatInfoBox.innerHTML += '<p class="chat-list ' + (data.isMe ? 'isMe' : '') + '">' + data.cont + '</p>';
+                            }
+
+                            if(data.dataType === 'onlineUserNum' || data.dataType === 'chatInfo'){
+                                chatInfoBox.scrollTop = chatInfoBox.scrollHeight;
                             }
                         };
 
                         if (socket.readyState == WebSocket.OPEN) socket.onopen();
                         window.s = socket;
-                        setSocketBtn.innerHTML = '退出房间';
-                        document.getElementById('startDraw').style.display = 'inline-block';
                         return;
                     }
                     // Call onopen directly if socket is already open
@@ -283,17 +382,37 @@
                     }, false)
 
                     //设置自定义画笔颜色
-                    document.getElementById('pen_custom_color').onkeydown = function(e){
-                        if(!e){
-                            e = window.event;
+                    // document.getElementById('pen_custom_color').onkeydown = function(e){
+                        // if(!e){
+                        //     e = window.event;
+                        // }
+                        // if((e.keyCode || e.which) == 13){
+                        //     document.getElementById('currentColor').style.backgroundColor = ctx.strokeStyle = this.value;
+                        //     currentColorEl.style.backgroundColor = this.value;
+                        //     switchToolEl.innerHTML = '切换橡皮擦';
+                        //     _this.canvas.style.cursor = 'url(pen.png),default';
+                        // }
+                    // }
+                    // $('#pen_custom_color').colpick();
+                    var currentColorEl = document.getElementById('currentColor'),picker = null;
+                    currentColorEl.addEventListener('click',function(e){
+                        if(!picker){
+                            picker = new ColorPicker(currentColorEl, {
+                                onUpdate: function(rgb) {
+                                    currentColorEl.style.background = "rgb(" + rgb[0] + ", " + rgb[1] + ", " + rgb[2] + ")";
+                                    ctx.strokeStyle = currentColorEl.style.background;
+                                }
+                            });
                         }
-                        if((e.keyCode || e.which) == 13){
-                            document.getElementById('currentColor').style.backgroundColor = ctx.strokeStyle = this.value;
-                            currentColorEl.style.backgroundColor = this.value;
-                            switchToolEl.innerHTML = '切换橡皮擦';
-                            _this.canvas.style.cursor = 'url(pen.png),default';
-                        }
-                    }
+                        $('.color-picker-container')[0].style.display = 'inline-block';
+                        e.stopPropagation();
+                    }, true)
+
+                    document.body.addEventListener('click', function(e){
+                        if($('.color-picker-container')[0] && $('.color-picker-container')[0].style.display === 'inline-block') e.stopPropagation();
+                        if($('.color-picker-container')[0]) $('.color-picker-container')[0].style.display = 'none';
+                    }, true)
+
 
                     //设置切换工具
                     switchToolEl.addEventListener('click', function(){
@@ -336,7 +455,10 @@
                             } else {
                                 clearTimeout(timer);
                                 timer = setTimeout(function(){
-                                    window.s.send(canvas.toDataURL());//通过websocket发送数据
+                                    window.s.send(JSON.stringify({
+                                        dataType: 'base64',
+                                        cont: canvas.toDataURL()
+                                    }));//通过websocket发送数据
                                 }, 500)
                             }
                         }
