@@ -6,12 +6,15 @@
         <title>任意画布</title>
     </head>
     <link rel="stylesheet" type="text/css" href="css/colpick.css">
+    <link rel="stylesheet" type="text/css" href="js/layer/theme/default/layer.css">
     <style type="text/css">
         *{
             padding: 0;
             margin: 0;
         }
         body{
+        }
+        .canvas-box{
             font-size: 0;
         }
         canvas{
@@ -103,7 +106,9 @@
         }
     </style>
     <body style="display: none" onload="myCanvas.init()">
-        <canvas id="canvas" width="800" height="600" style="cursor: url(pen.png),default;"></canvas>
+        <div class="canvas-box">
+            <canvas id="canvas" width="800" height="600" style="cursor: url(pen.png),default;"></canvas>
+        </div>
         <div class="tool-box">
             <p class="title">当前画笔颜色（点击可切换颜色）</p>
             <div id="pen_color_box">
@@ -127,7 +132,7 @@
             <p class="title">提示</p>
             <div class="tips_box">
                 <p>1、鼠标右键可以直接切换笔或橡皮</p>
-                <p>2、鼠标滚轮可以调画笔或橡皮大小</p>
+                <p>2、画画权由第一个玩家掌控</p>
             </div>
 
             <p class="title">多人设置</p>
@@ -151,8 +156,9 @@
             <img id="drawCanvas" style="position: fixed;left: 0;top: 0;">
         </div>
         <script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
-        <script type="text/javascript" src="../socket/api_config.js"></script>
+        <script type="text/javascript" src="../api_config.js"></script>
         <script type="text/javascript" src="js/colpick.js"></script>
+        <script type="text/javascript" src="js/layer/layer.js"></script>
         <script type="text/javascript">
             var myCanvas = {
                 init: function(){
@@ -182,7 +188,7 @@
 
                     var setSocketBtn = document.getElementById('setSocketBtn');
                     setSocketBtn.addEventListener('click', function(){
-                        _this.openSocket(setSocketBtn);
+                        _this.setSocket(setSocketBtn);
                     },false)
 
                     var startDrawBtn = document.getElementById('startDraw');
@@ -219,8 +225,52 @@
                         }
                     },true)
                 },
-
                 openSocket: function(setSocketBtn){
+                    var _this = this;
+                    var myName = document.getElementById('txt_myName').value;
+                    /*创建socket连接*/
+                    var socket = _this.socket = new WebSocket("ws://" + socketApi);
+
+                    socket.onopen = function () {
+                        setSocketBtn.innerHTML = '退出房间';
+                        _this.myName = myName;
+                        window.s.send(JSON.stringify({
+                            dataType: 'setMyName',
+                            cont: myName
+                        }));
+                    };
+                    socket.onclose = function () {
+                        console.log('WebSocket close');//成功连接上Websocket
+                    };
+                    socket.onmessage = function (e) {
+                        var data = JSON.parse(e.data);
+                        var chatInfoBox = document.getElementById('chatInfoBox');
+                        if(data.dataType === 'base64'){
+                            document.getElementById('drawCanvas').src = data.cont;
+                        }else if(data.dataType === 'onlineUserNum'){
+                            chatInfoBox.innerHTML += '<p class="tips">' + data.cont + '</p>';
+                            if(data.isOut && data.name === _this.myName){
+                                document.getElementById('startDraw').style.display = 'inline-block';
+                            }
+                        }else if(data.dataType === 'setMyName'){
+                            if(data.onlineUserNum && data.onlineUserNum === 1){
+                                document.getElementById('startDraw').style.display = 'inline-block';
+                            }
+                            chatInfoBox.innerHTML += '<p class="tips">' + data.cont + '</p>';
+                        }else if(data.dataType === 'chatInfo'){
+                            chatInfoBox.innerHTML += '<p class="chat-list ' + (data.isMe ? 'isMe' : '') + '">' + data.cont + '</p>';
+                        }
+
+                        if(data.dataType === 'onlineUserNum' || data.dataType === 'chatInfo'){
+                            chatInfoBox.scrollTop = chatInfoBox.scrollHeight;
+                        }
+                    };
+
+                    if (socket.readyState == WebSocket.OPEN) socket.onopen();
+                    window.s = socket;
+                    layer.closeAll();
+                },
+                setSocket: function(setSocketBtn){
                     var _this = this;
                     if(window.s){
                         window.s.close();
@@ -231,38 +281,19 @@
                         _this.ctx.clearRect(0,0,_this.canvas.width,_this.canvas.height);
                         return;
                     }else{
-                        /*创建socket连接*/
-                        var socket = _this.socket = new WebSocket("ws://" + socketApi);
-
-                        socket.onopen = function () {
-                            console.log('WebSocket open');//成功连接上Websocket
-                            setSocketBtn.innerHTML = '退出房间';
-                        };
-                        socket.onclose = function () {
-                            console.log('WebSocket close');//成功连接上Websocket
-                        };
-                        socket.onmessage = function (e) {
-                            var data = JSON.parse(e.data);
-                            var chatInfoBox = document.getElementById('chatInfoBox');
-                            if(data.dataType === 'base64'){
-                                document.getElementById('drawCanvas').src = data.cont;
-                            }else if(data.dataType === 'onlineUserNum'){
-                                chatInfoBox.innerHTML += '<p class="tips">' + data.cont + '</p>';
-                                if(data.onlineUserNum && data.onlineUserNum === 1){
-                                    document.getElementById('startDraw').style.display = 'inline-block';
-                                }
-                            }else if(data.dataType === 'chatInfo'){
-                                chatInfoBox.innerHTML += '<p class="chat-list ' + (data.isMe ? 'isMe' : '') + '">' + data.cont + '</p>';
-                            }
-
-                            if(data.dataType === 'onlineUserNum' || data.dataType === 'chatInfo'){
-                                chatInfoBox.scrollTop = chatInfoBox.scrollHeight;
-                            }
-                        };
-
-                        if (socket.readyState == WebSocket.OPEN) socket.onopen();
-                        window.s = socket;
-                        return;
+                        layer.open({
+                          type: 1,
+                          skin: 'layui-layer-rim', //加上边框
+                          title: '设置您的名字',
+                          area: ['420px', '180px'], //宽高
+                          content: '<div style="padding:20px;text-align: center;"><input style="padding-left:10px;height: 30px;font-size: 14px;" type="text" id="txt_myName" placeholder="请输入您的姓名" value="' + (_this.myName ? _this.myName : '') + '" /></div>',
+                          btn: '确定',
+                          success: function(){
+                          },
+                          btn1: function(layero, index){
+                            _this.openSocket(setSocketBtn);
+                          }
+                        });
                     }
                     // Call onopen directly if socket is already open
                 },
@@ -288,12 +319,12 @@
                         }
                         ctx.lineWidth = lineSetEl.value;
                     };  
-                    //给页面绑定滑轮滚动事件  
-                    if (document.addEventListener) {  
-                        _this.canvas.addEventListener('DOMMouseScroll', scrollFunc, false);  
-                    }  
-                    //滚动滑轮触发scrollFunc方法  
-                    window.onmousewheel = document.onmousewheel = scrollFunc;  
+                    // //给页面绑定滑轮滚动事件  
+                    // if (document.addEventListener) {  
+                    //     _this.canvas.addEventListener('DOMMouseScroll', scrollFunc, false);  
+                    // }  
+                    // //滚动滑轮触发scrollFunc方法  
+                    // window.onmousewheel = document.onmousewheel = scrollFunc;  
                 },
                 resizeCanvas: function(){  //初始化画布大小
                     var canvas = this.canvas;

@@ -6,38 +6,26 @@ var userNum = 0
 
 var server = ws.createServer(function (conn) {
     userNum++;
-    var myName = '玩家' + userNum;
+    var myName = '';
     AllUserData.push({
-        'user': conn,
-        'name': '玩家' + userNum
+        'user': conn
     })
 
-    var sendText = '';
-    for(var i = 0 ; i < AllUserData.length; i++){
-        sendText = {
-            dataType: 'onlineUserNum',
-            onlineUserNum: userNum,
-            cont: ''
-        };
-        if(AllUserData[i].user == conn){
-            sendText.cont = myName + '加入房间，目前房间人数为' + userNum + '人';
-            // console.log(sendText);
-        }else{
-            sendText.cont = myName + '加入房间，目前房间人数为' + userNum + '人';
-        }
-        AllUserData[i].user.sendText(JSON.stringify(sendText));
-    }
     conn.on("text", function (jsonData) {
         var obj = {};
         for(var i = 0 ; i < AllUserData.length; i++){
             obj = JSON.parse(jsonData);
-            if(obj.dataType !== 'base64'){
+            if(obj.dataType === 'chatInfo'){
                 if(AllUserData[i].user !== conn){
                     obj.cont = myName + '说（' + dateFtt('hh:mm:ss', new Date()) + '）：' + obj.cont;
                 }else{
                     obj.isMe = true;
                     obj.cont = '我说（' + dateFtt('hh:mm:ss', new Date()) + '）：' + obj.cont;
                 }
+            }else if(obj.dataType === 'setMyName'){
+                myName = AllUserData[i].name = obj.cont;
+                obj.onlineUserNum = userNum;
+                obj.cont = AllUserData[i].name + '加入房间，目前房间人数为' + userNum + '人';
             }
             AllUserData[i].user.sendText(JSON.stringify(obj));
         }
@@ -53,6 +41,8 @@ var server = ws.createServer(function (conn) {
                     sendText = {
                         dataType: 'onlineUserNum',
                         onlineUserNum: userNum,
+                        isOut: true,
+                        name: AllUserData[0].name,
                         cont: ''
                     };
                     sendText.cont = myName + '已退出房间，目前房间人数为' + userNum + '人';
